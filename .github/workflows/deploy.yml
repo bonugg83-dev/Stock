@@ -1,0 +1,60 @@
+name: 데이터 수집 및 배포
+
+# - main 브랜치에 push할 때
+# - 평일 한국시간 14:17, 18:17 (공공데이터포털은 전 거래일 종가를 다음 영업일 오후에 공개)
+# - Actions 탭에서 수동 실행 (Run workflow)
+on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: '17 5 * * 1-5'
+    - cron: '17 9 * * 1-5'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: 계산 엔진 테스트
+        run: npm test
+
+      - name: 가격·환율 수집
+        env:
+          DATA_GO_KR_KEY: ${{ secrets.DATA_GO_KR_KEY }}
+          PREV_MARKET_URL: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/data/market.json
+        run: node --experimental-strip-types scripts/fetch-market-data.ts
+
+      - name: 웹앱 빌드
+        run: npm run build
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
