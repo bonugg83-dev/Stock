@@ -35,7 +35,7 @@ jobs:
           DATA_GO_KR_KEY: ${{ secrets.DATA_GO_KR_KEY }}
         run: |
           BEGIN=$(TZ=Asia/Seoul date -d '14 days ago' +%Y%m%d)
-          curl -sS -G 'https://apis.data.go.kr/1160100/service/GetSecuritiesProductInfoService/getETFPriceInfo' \
+          curl -sS -G 'https://apis.data.go.kr/1160100/GetSecuritiesProductInfoService_V2/getETFPriceInfo_V2' \
             --data-urlencode "serviceKey=$DATA_GO_KR_KEY" \
             --data-urlencode 'resultType=json' --data-urlencode 'likeSrtnCd=360750' \
             --data-urlencode "beginBasDt=$BEGIN" --data-urlencode 'numOfRows=3' \

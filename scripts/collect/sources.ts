@@ -12,7 +12,7 @@ import type { SeriesPoint } from '../../src/data/marketTypes.ts';
  */
 
 export const ETF_ENDPOINT =
-  'https://apis.data.go.kr/1160100/service/GetSecuritiesProductInfoService/getETFPriceInfo';
+  'https://apis.data.go.kr/1160100/GetSecuritiesProductInfoService_V2/getETFPriceInfo_V2';
 export const FX_ENDPOINT = 'https://api.frankfurter.dev/v1';
 
 export const ETF_SOURCE = '공공데이터포털 금융위원회 증권상품시세정보 (KRX)';
@@ -62,7 +62,7 @@ export async function fetchEtfHistory(
   fetchFn: FetchFn = fetch,
 ): Promise<SeriesPoint[]> {
   const out: SeriesPoint[] = [];
-  const numOfRows = 1000;
+  const numOfRows = 1000; // 가이드: 요청값이 10,000건을 넘으면 10,000건까지만 조회됨
   for (let page = 1; page <= 20; page++) {
     const q = new URLSearchParams({
       serviceKey,
