@@ -27,6 +27,10 @@ describe('공공데이터포털 ETF 응답 파싱', () => {
     const f = (async () => new Response('<OpenAPI_ServiceResponse>SERVICE_KEY_IS_NOT_REGISTERED_ERROR</OpenAPI_ServiceResponse>')) as typeof fetch;
     await expect(fetchEtfHistory('360750', 'k', '2026-01-01', '2026-10-16', f)).rejects.toThrow('JSON이 아닌 응답');
   });
+  it('미등록 키 403 응답은 사유를 알려준다', async () => {
+    const f = (async () => new Response('{"OpenAPI_ServiceResponse":{"cmmMsgHeader":{"errMsg":"SERVICE_KEY_IS_NOT_REGISTERED_ERROR"}}}', { status: 403 })) as typeof fetch;
+    await expect(fetchEtfHistory('360750', 'k', '2026-01-01', '2026-10-16', f)).rejects.toThrow('등록되지 않은 서비스키');
+  });
   it('HTTP 오류(가격 API 실패)', async () => {
     const f = (async () => new Response('x', { status: 500 })) as typeof fetch;
     await expect(fetchEtfHistory('360750', 'k', '2026-01-01', '2026-10-16', f)).rejects.toThrow('HTTP 500');

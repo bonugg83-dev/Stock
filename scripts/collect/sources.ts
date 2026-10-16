@@ -44,6 +44,16 @@ export function parseEtfResponse(json: unknown, code: string): { points: SeriesP
   return { points, totalCount: Number(body.body?.totalCount ?? 0) };
 }
 
+/** 공공데이터포털 인증 오류 응답에서 사유를 뽑아 사람이 읽을 수 있게 만든다 */
+export function describePortalError(text: string): string {
+  const m = text.match(/SERVICE_KEY_IS_NOT_REGISTERED_ERROR|[A-Z_]+_ERROR/);
+  if (!m) return '';
+  if (m[0] === 'SERVICE_KEY_IS_NOT_REGISTERED_ERROR') {
+    return ' (등록되지 않은 서비스키: 이 API에 활용신청이 승인됐는지, 승인 후 1~2시간이 지났는지, Decoding 키를 넣었는지 확인)';
+  }
+  return ` (${m[0]})`;
+}
+
 export async function fetchEtfHistory(
   code: string,
   serviceKey: string,
@@ -64,8 +74,8 @@ export async function fetchEtfHistory(
       pageNo: String(page),
     });
     const res = await fetchFn(`${ETF_ENDPOINT}?${q}`);
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const text = await res.text();
+    if (!res.ok) throw new Error(`HTTP ${res.status}${describePortalError(text)}`);
     let json: unknown;
     try {
       json = JSON.parse(text);
