@@ -1,0 +1,49 @@
+name: API 키·데이터 수집 점검
+
+# 작업 브랜치에 push하거나 Actions 탭에서 수동 실행. 배포는 하지 않는다.
+# 인증키 값은 출력하지 않는다 (등록 여부와 API 응답 결과만 표시).
+on:
+  push:
+    branches: ['claude/**']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: 인증키 등록 여부
+        env:
+          DATA_GO_KR_KEY: ${{ secrets.DATA_GO_KR_KEY }}
+        run: |
+          if [ -z "$DATA_GO_KR_KEY" ]; then
+            echo "::error::DATA_GO_KR_KEY 가 등록되어 있지 않습니다 (Settings → Secrets and variables → Actions)"
+            exit 1
+          fi
+          echo "DATA_GO_KR_KEY 등록됨 (길이 ${#DATA_GO_KR_KEY}자)"
+
+      - name: 공공데이터포털 ETF 시세 API 응답 확인
+        env:
+          DATA_GO_KR_KEY: ${{ secrets.DATA_GO_KR_KEY }}
+        run: |
+          BEGIN=$(TZ=Asia/Seoul date -d '14 days ago' +%Y%m%d)
+          curl -sS -G 'https://apis.data.go.kr/1160100/service/GetSecuritiesProductInfoService/getETFPriceInfo' \
+            --data-urlencode "serviceKey=$DATA_GO_KR_KEY" \
+            --data-urlencode 'resultType=json' --data-urlencode 'likeSrtnCd=360750' \
+            --data-urlencode "beginBasDt=$BEGIN" --data-urlencode 'numOfRows=3' \
+            -o resp.txt -w 'HTTP %{http_code}\n'
+          head -c 1500 resp.txt; echo
+
+      - name: 수집기 전체 실행 (결과 요약)
+        env:
+          DATA_GO_KR_KEY: ${{ secrets.DATA_GO_KR_KEY }}
+          OUT_FILE: /tmp/market.json
+        run: node --experimental-strip-types scripts/fetch-market-data.ts
