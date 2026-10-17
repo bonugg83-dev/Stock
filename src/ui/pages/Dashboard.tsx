@@ -11,6 +11,7 @@ import { ASSET_LABEL, RISKY_ASSETS, type AssetKey } from '../../engine/types';
 import type { Quote } from '../../data/marketTypes';
 import { Button, Card, Disclaimer, FreshnessBadge, Notice, Term, WeightBars, cx, formatDateTime } from '../components/ui';
 import DepositModal from './DepositModal';
+import { BackupReminder } from '../components/BackupReminder';
 
 export default function Dashboard() {
   const app = useAppData();
@@ -44,6 +45,7 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-4">
+      <BackupReminder />
       {/* 행동 안내 */}
       <Card>
         <div className="flex flex-wrap items-center justify-between gap-3">

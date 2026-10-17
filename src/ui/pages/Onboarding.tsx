@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { completeOnboarding, TAX_RATE_BY_ACCOUNT } from '../../db/repo';
+import { completeOnboarding, importBackup, TAX_RATE_BY_ACCOUNT, type BackupFile } from '../../db/repo';
 import type { AccountType } from '../../db/schema';
 import { validateOnboarding, validateWeights } from '../../engine/validation';
 import { nextRebalanceDate, todayKst, type RebalanceSchedule } from '../../engine/schedule';
@@ -77,6 +77,31 @@ export default function Onboarding() {
           규칙을 미리 정해두면, 앱이 정해진 날에 계산상 조정안을 보여드립니다. 실제 주문은 직접 하셔야 합니다.
         </p>
       </header>
+
+      <Card title="이전에 쓰던 데이터가 있나요?">
+        <p className="text-sm text-slate-600 dark:text-slate-300">
+          설정 화면에서 내려받은 백업 파일이 있으면 그대로 복원할 수 있습니다. 브라우저 데이터가 지워졌거나 다른 기기에서 열었을 때 사용하세요.
+        </p>
+        <label className="mt-3 inline-flex cursor-pointer items-center rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium dark:border-slate-700">
+          백업 파일로 복원
+          <input
+            type="file"
+            accept="application/json"
+            className="hidden"
+            onChange={async (e) => {
+              const f = e.target.files?.[0];
+              if (!f) return;
+              try {
+                await importBackup(JSON.parse(await f.text()) as BackupFile);
+                nav('/');
+              } catch (err) {
+                setErrors({ restore: (err as Error).message });
+              }
+            }}
+          />
+        </label>
+        {errors.restore && <p className="mt-2 text-xs font-medium text-amber-700 dark:text-amber-400">⚠ {errors.restore}</p>}
+      </Card>
 
       <Card title="1. 투자금">
         <div className="space-y-3">

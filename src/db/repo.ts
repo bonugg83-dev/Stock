@@ -198,7 +198,7 @@ export interface BackupFile {
   tables: Record<string, unknown[]>;
 }
 
-const BACKUP_TABLES = ['settings', 'holdings', 'ledger', 'rebalances', 'distributions', 'settingsHistory'] as const;
+export const BACKUP_TABLES = ['settings', 'holdings', 'ledger', 'rebalances', 'distributions', 'settingsHistory'] as const;
 
 export async function exportBackup(database: AppDB = db): Promise<BackupFile> {
   const tables: Record<string, unknown[]> = {};

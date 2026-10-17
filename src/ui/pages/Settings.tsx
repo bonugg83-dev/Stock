@@ -1,14 +1,19 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useAppData } from '../../app/AppData';
-import { exportBackup, importBackup, resetAll, TAX_RATE_BY_ACCOUNT, updateSettings, type BackupFile } from '../../db/repo';
+import { importBackup, resetAll, TAX_RATE_BY_ACCOUNT, updateSettings, type BackupFile } from '../../db/repo';
+import { downloadBackup, isStoragePersisted, lastBackupAt, requestPersistentStorage } from '../../db/backupFile';
 import type { AccountType, UserSettings } from '../../db/schema';
 import { validateWeights } from '../../engine/validation';
 import type { RebalanceSchedule } from '../../engine/schedule';
 import { Button, Card, Disclaimer, Field, FreshnessBadge, Input, Modal, Notice, formatDateTime } from '../components/ui';
 import { ScheduleEditor } from '../components/ScheduleEditor';
+import { useSync } from '../../sync/SyncProvider';
 
 export default function Settings() {
   const app = useAppData();
+  const sync = useSync();
+  const [projectId, setProjectId] = useState('');
+  const [apiKey, setApiKey] = useState('');
   const s = app.settings!;
   const [w, setW] = useState({ stock: String(s.targets.stock), bond: String(s.targets.bond), cash: String(s.targets.cash) });
   const [schedule, setSchedule] = useState<RebalanceSchedule>(s.schedule);
@@ -23,6 +28,11 @@ export default function Settings() {
   const [msg, setMsg] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [resetOpen, setResetOpen] = useState(false);
+  const [last, setLast] = useState<string | null>(lastBackupAt());
+  const [persisted, setPersisted] = useState<boolean | null>(null);
+  useEffect(() => {
+    isStoragePersisted().then(setPersisted);
+  }, []);
 
   const weights = { stock: Number(w.stock), bond: Number(w.bond), cash: Number(w.cash) };
   const wc = validateWeights(weights);
@@ -55,13 +65,8 @@ export default function Settings() {
   };
 
   const download = async () => {
-    const b = await exportBackup();
-    const url = URL.createObjectURL(new Blob([JSON.stringify(b, null, 1)], { type: 'application/json' }));
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `rebalance-backup-${app.today}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
+    await downloadBackup(app.today);
+    setLast(lastBackupAt());
   };
 
   const upload = async (file: File) => {
@@ -162,10 +167,57 @@ export default function Settings() {
         </div>
       </Card>
 
+      <Card title="기기 간 동기화 (폰·태블릿·PC 같은 데이터)">
+        {sync.enabled ? (
+          <div className="space-y-2 text-sm">
+            <p>
+              상태: <b>{sync.status === 'idle' ? '연결됨 · 동기화됨' : sync.status === 'syncing' ? '동기화 중…' : sync.status === 'conflict' ? '선택 필요' : '오류'}</b> · 프로젝트 {sync.projectId}
+            </p>
+            <p className="text-xs text-slate-500">마지막 동기화 {formatDateTime(sync.lastSyncedAt)}. 데이터를 바꾸면 몇 초 안에 자동으로 올라가고, 다른 기기에서 앱을 열거나 다시 보면 자동으로 받아옵니다.</p>
+            {sync.error && <Notice tone="warning">{sync.error}</Notice>}
+            <div className="flex flex-wrap gap-2">
+              <Button variant="secondary" onClick={() => void sync.syncNow()}>지금 동기화</Button>
+              <Button variant="ghost" onClick={sync.clearConnection}>이 기기 연결 정보 지우기</Button>
+            </div>
+            <p className="text-xs text-slate-500">로그인이 없습니다. 같은 서버를 쓰는 모든 기기가 한 사람의 데이터를 공유하는 구조입니다.</p>
+          </div>
+        ) : (
+          <div className="space-y-3 text-sm">
+            <Notice>동기화가 꺼져 있어 이 브라우저에만 저장됩니다. README의 "기기 간 동기화 켜기"대로 Firebase를 만든 뒤 아래에 입력하세요.</Notice>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Field label="Firebase 프로젝트 ID">
+                <Input value={projectId} onChange={(e) => setProjectId(e.target.value)} placeholder="예: my-rebalance-1234" />
+              </Field>
+              <Field label="웹 API 키">
+                <Input value={apiKey} onChange={(e) => setApiKey(e.target.value)} placeholder="AIza..." />
+              </Field>
+            </div>
+            <Button disabled={!projectId.trim() || !apiKey.trim()} onClick={() => sync.saveConnection(projectId, apiKey)}>
+              연결하고 이 기기에서 시작
+            </Button>
+            <p className="text-xs text-slate-500">여기에 입력하면 이 기기에만 저장됩니다. 저장소 설정 파일(src/config/sync.json)에 넣으면 모든 기기가 자동으로 연결됩니다.</p>
+          </div>
+        )}
+      </Card>
+
       <Card title="백업 · 초기화">
         <p className="text-sm text-slate-600 dark:text-slate-300">
           모든 기록은 이 브라우저 안에만 저장됩니다. 브라우저 데이터를 지우면 사라지므로 정기적으로 백업 파일을 내려받으세요. 다른 기기로 옮길 때도 사용합니다.
         </p>
+        <ul className="mt-2 space-y-1 text-xs text-slate-600 dark:text-slate-300">
+          <li>마지막 백업: {last ? formatDateTime(last) : '없음'}</li>
+          <li>
+            브라우저 저장 보호: {persisted === null ? '확인 불가' : persisted ? '켜짐 (브라우저가 임의로 지우지 않음)' : '꺼짐'}
+            {persisted === false && (
+              <>
+                {' '}
+                <button className="underline" onClick={async () => setPersisted(await requestPersistentStorage())}>
+                  보호 요청하기
+                </button>
+              </>
+            )}
+          </li>
+        </ul>
         <div className="mt-3 flex flex-wrap gap-2">
           <Button variant="secondary" onClick={download}>백업 파일 내려받기</Button>
           <label className="inline-flex cursor-pointer items-center rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium dark:border-slate-700">
@@ -181,10 +233,11 @@ export default function Settings() {
         <Modal title="데이터를 모두 지울까요?" onClose={() => setResetOpen(false)}>
           <div className="space-y-3 text-sm">
             <p>설정·보유 수량·납입·계산 기록이 모두 삭제되고 처음 설정 화면으로 돌아갑니다. 되돌릴 수 없으니 먼저 백업 파일을 내려받으세요.</p>
+            {sync.enabled && <Notice tone="warning">동기화가 켜져 있어 <b>다른 기기와 서버의 데이터도 모두 지워집니다.</b></Notice>}
             <div className="flex justify-end gap-2">
               <Button variant="secondary" onClick={() => setResetOpen(false)}>취소</Button>
               <Button variant="secondary" onClick={download}>백업 먼저 받기</Button>
-              <Button onClick={async () => { await resetAll(); setResetOpen(false); }}>모두 삭제</Button>
+              <Button onClick={async () => { await resetAll(); await sync.afterLocalReset(); setResetOpen(false); }}>모두 삭제</Button>
             </div>
           </div>
         </Modal>

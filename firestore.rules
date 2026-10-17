@@ -1,0 +1,12 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 앱 데이터는 문서 하나(app/main)만 사용합니다.
+    // 읽기(get)·만들기·수정은 허용하고, 목록 조회와 삭제는 막습니다.
+    // 로그인 없이 쓰는 설정이므로 주소·프로젝트 정보를 아는 사람은 이 문서를 읽고 쓸 수 있습니다.
+    match /app/main {
+      allow get: if true;
+      allow create, update: if true;
+    }
+  }
+}
