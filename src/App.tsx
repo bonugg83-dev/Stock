@@ -6,6 +6,8 @@ import { db } from './db/db';
 import { buildNotices } from './engine/notifications';
 import { requestPersistentStorage } from './db/backupFile';
 import { cx, formatDateTime } from './ui/components/ui';
+import { ConflictModal, SyncBadge } from './ui/components/SyncUi';
+import { useSync } from './sync/SyncProvider';
 import Onboarding, { OnboardingSummary } from './ui/pages/Onboarding';
 import Dashboard from './ui/pages/Dashboard';
 import Rebalance from './ui/pages/Rebalance';
@@ -92,6 +94,7 @@ function Bell() {
 
 export default function App() {
   const app = useAppData();
+  const sync = useSync();
   useNotificationSync();
   const hasSettings = !!app.settings;
   // 설정이 저장된 뒤에는 브라우저가 저장 공간을 임의로 지우지 않도록 요청
@@ -100,11 +103,16 @@ export default function App() {
   }, [hasSettings]);
 
   if (!app.ready) return <div className="p-8 text-center text-sm text-slate-500">불러오는 중…</div>;
+  // 새 기기에서는 서버에 저장된 데이터를 먼저 확인한 뒤에 첫 설정 화면을 보여준다
+  if (!app.settings && !sync.initialDone) return <div className="p-8 text-center text-sm text-slate-500">저장된 데이터를 확인하는 중…</div>;
   if (!app.settings) {
     return (
-      <Routes>
-        <Route path="*" element={<Onboarding />} />
-      </Routes>
+      <>
+        <Routes>
+          <Route path="*" element={<Onboarding />} />
+        </Routes>
+        <ConflictModal />
+      </>
     );
   }
 
@@ -120,7 +128,10 @@ export default function App() {
               </NavLink>
             ))}
           </nav>
-          <Bell />
+          <div className="flex items-center gap-1">
+            <SyncBadge />
+            <Bell />
+          </div>
         </div>
       </header>
       <main className="mx-auto max-w-5xl px-4 py-4">
@@ -134,6 +145,7 @@ export default function App() {
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </main>
+      <ConflictModal />
       <nav className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-5 border-t border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900 sm:hidden">
         {NAV.map((n) => (
           <NavLink key={n.to} to={n.to} end className={({ isActive }) => cx('py-3 text-center text-xs', isActive ? 'font-bold text-slate-900 dark:text-white' : 'text-slate-500')}>

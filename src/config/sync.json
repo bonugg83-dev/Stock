@@ -1,0 +1,8 @@
+{
+  "_설명": "기기 간 동기화(Firebase Firestore) 연결 정보. 비밀 값이 아닙니다(웹앱에 공개되는 값). 비워 두면 동기화가 꺼지고 이 브라우저에만 저장됩니다.",
+  "projectId": "",
+  "apiKey": "",
+  "endpoint": "https://firestore.googleapis.com",
+  "collection": "app",
+  "docId": "main"
+}
