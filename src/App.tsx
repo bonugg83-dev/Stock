@@ -4,6 +4,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { useAppData } from './app/AppData';
 import { db } from './db/db';
 import { buildNotices } from './engine/notifications';
+import { requestPersistentStorage } from './db/backupFile';
 import { cx, formatDateTime } from './ui/components/ui';
 import Onboarding, { OnboardingSummary } from './ui/pages/Onboarding';
 import Dashboard from './ui/pages/Dashboard';
@@ -92,6 +93,11 @@ function Bell() {
 export default function App() {
   const app = useAppData();
   useNotificationSync();
+  const hasSettings = !!app.settings;
+  // 설정이 저장된 뒤에는 브라우저가 저장 공간을 임의로 지우지 않도록 요청
+  useEffect(() => {
+    if (hasSettings) requestPersistentStorage();
+  }, [hasSettings]);
 
   if (!app.ready) return <div className="p-8 text-center text-sm text-slate-500">불러오는 중…</div>;
   if (!app.settings) {

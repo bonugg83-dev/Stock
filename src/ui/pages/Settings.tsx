@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useAppData } from '../../app/AppData';
-import { exportBackup, importBackup, resetAll, TAX_RATE_BY_ACCOUNT, updateSettings, type BackupFile } from '../../db/repo';
+import { importBackup, resetAll, TAX_RATE_BY_ACCOUNT, updateSettings, type BackupFile } from '../../db/repo';
+import { downloadBackup, isStoragePersisted, lastBackupAt, requestPersistentStorage } from '../../db/backupFile';
 import type { AccountType, UserSettings } from '../../db/schema';
 import { validateWeights } from '../../engine/validation';
 import type { RebalanceSchedule } from '../../engine/schedule';
@@ -23,6 +24,11 @@ export default function Settings() {
   const [msg, setMsg] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [resetOpen, setResetOpen] = useState(false);
+  const [last, setLast] = useState<string | null>(lastBackupAt());
+  const [persisted, setPersisted] = useState<boolean | null>(null);
+  useEffect(() => {
+    isStoragePersisted().then(setPersisted);
+  }, []);
 
   const weights = { stock: Number(w.stock), bond: Number(w.bond), cash: Number(w.cash) };
   const wc = validateWeights(weights);
@@ -55,13 +61,8 @@ export default function Settings() {
   };
 
   const download = async () => {
-    const b = await exportBackup();
-    const url = URL.createObjectURL(new Blob([JSON.stringify(b, null, 1)], { type: 'application/json' }));
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `rebalance-backup-${app.today}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
+    await downloadBackup(app.today);
+    setLast(lastBackupAt());
   };
 
   const upload = async (file: File) => {
@@ -166,6 +167,20 @@ export default function Settings() {
         <p className="text-sm text-slate-600 dark:text-slate-300">
           모든 기록은 이 브라우저 안에만 저장됩니다. 브라우저 데이터를 지우면 사라지므로 정기적으로 백업 파일을 내려받으세요. 다른 기기로 옮길 때도 사용합니다.
         </p>
+        <ul className="mt-2 space-y-1 text-xs text-slate-600 dark:text-slate-300">
+          <li>마지막 백업: {last ? formatDateTime(last) : '없음'}</li>
+          <li>
+            브라우저 저장 보호: {persisted === null ? '확인 불가' : persisted ? '켜짐 (브라우저가 임의로 지우지 않음)' : '꺼짐'}
+            {persisted === false && (
+              <>
+                {' '}
+                <button className="underline" onClick={async () => setPersisted(await requestPersistentStorage())}>
+                  보호 요청하기
+                </button>
+              </>
+            )}
+          </li>
+        </ul>
         <div className="mt-3 flex flex-wrap gap-2">
           <Button variant="secondary" onClick={download}>백업 파일 내려받기</Button>
           <label className="inline-flex cursor-pointer items-center rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium dark:border-slate-700">
